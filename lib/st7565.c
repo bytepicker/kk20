@@ -434,7 +434,7 @@ void st7565DrawString(uint16_t x, uint16_t y, const char* text)
 void st7565DrawString_P(uint16_t x, uint16_t y, const char* text)
 {
 	char c;
-  uint8_t l = 0;
+	uint8_t l = 0;
 	
 	c = pgm_read_byte(text++);
 	if (c != 0)
