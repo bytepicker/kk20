@@ -21,13 +21,14 @@ const int HUM_LIMIT = 50;
 char mBuf[7];
 String Str;
 
-int newBegin = 0;
-
 /* total measurements */
 int totalMeas;
 
+/* floats splitting*/
+double intTemp, intHum, flTemp, flHum;
+
 /* EEPROM */
-const int EEPROM_ADDRESS = 0;
+int EEPROM_ADDRESS = 0;
 
 /* SHT21 sensor */
 const byte TEMPERATURE = 0xe3;
@@ -168,36 +169,37 @@ void printLog(int beg, int end){
   for(int i=beg; i<=end; ++i){
     sprintf(mBuf, "%u", EEPROM.read(0 + i*6));
     st7565DrawString(0*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(3*4, 10*(j+1) + 6, PSTR(":"));
-    
+
     sprintf(mBuf, "%u", EEPROM.read(1 + i*6));
     st7565DrawString(4*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(6*4, 10*(j+1) + 6, PSTR("  ")); 
-    
+
     sprintf(mBuf, "%u", EEPROM.read(2 + i*6));
     st7565DrawString(9*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(12*4, 10*(j+1) + 6, PSTR("."));
-    
+
     sprintf(mBuf, "%u", EEPROM.read(3 + i*6));
     st7565DrawString(13*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(16*4, 10*(j+1) + 6, PSTR("C, "));
-    
+
     sprintf(mBuf, "%u", EEPROM.read(4 + i*6));
     st7565DrawString(20*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(23*4, 10*(j+1) + 6, PSTR("."));
-    
+
     sprintf(mBuf, "%u", EEPROM.read(5 + i*6));
     st7565DrawString(24*4, 10*(j+1) + 6, mBuf);
-    
+
     st7565DrawString_P(27*4, 10*(j+1) + 6, PSTR("%"));
     j++;
-    }
+    delayMicroseconds(100);
   }
+}
 
 /* button 4 hook */
 byte button4Pressed(){
@@ -284,6 +286,7 @@ void logData()
   st7565ClearBuffer();
 
   int hrs = 0, mins = 0, secs = 0, done = 0;
+  EEPROM_ADDRESS = 0;
 
   while(true){
     st7565ClearBuffer();
@@ -330,30 +333,21 @@ void logData()
       // beep to start
       tone(_BUZZER, 100, 10);
 
-      // we need to 'split' our floats
-      double intTemp, intHum, flTemp, flHum;
-
       // total measurements required
       totalMeas = hrs * 60 + mins;
 
       for(int i=0; i<totalMeas; ++i) {
         digitalWrite(RED_LED,HIGH);
-
         EEPROM.write(i *6, getTime(2));    
         EEPROM.write(1 + i*6, getTime(1));
-
         flTemp = modf(getMeasurement(TEMPERATURE), &intTemp);
         EEPROM.write(2 + i*6, intTemp);
-
         flTemp *= 100;
         EEPROM.write(3 + i*6, flTemp);
-
         flHum = modf(getMeasurement(HUMIDITY), &intHum);
         EEPROM.write(4 + i*6, intHum);
-
         flHum *= 100;
         EEPROM.write(5 + i*6, flHum);
-
         // important!
         delay(SECOND);
       }
@@ -380,9 +374,12 @@ void logData()
   }
 }
 
+/* catch events and store date*/
 void logEvents(){
   st7565SetBrightness(12);
   st7565ClearBuffer();
+
+  EEPROM_ADDRESS = 0;
 
   while(true){
     st7565ClearBuffer();
@@ -401,17 +398,27 @@ void logEvents(){
     st7565DrawString_P(13*7, 26, PSTR(" C"));
 
     if(currentTemp > TEMP_LIMIT){
-      tone(_BUZZER, 100, 10);
       digitalWrite(RED_LED,HIGH);
-      // write time to EEPROM from 0
-      for(int i=2; i>0; i--){
-        EEPROM.write(EEPROM_ADDRESS, getTime(i));
-        //EEPROM_ADDRESS++;
-      }
-      // write value to EEPROM
-      EEPROM.write(EEPROM_ADDRESS, currentTemp);
-      //EEPROM_ADDRESS++;
+      EEPROM.write(EEPROM_ADDRESS, getTime(2));
+      EEPROM_ADDRESS +=1;    
+      EEPROM.write(EEPROM_ADDRESS, getTime(1));
+      EEPROM_ADDRESS +=1;   
+      flTemp = modf(getMeasurement(TEMPERATURE), &intTemp);
+      EEPROM.write(EEPROM_ADDRESS, intTemp);
+      EEPROM_ADDRESS +=1; 
+      flTemp *= 100;
+      EEPROM.write(EEPROM_ADDRESS, flTemp);
+      EEPROM_ADDRESS +=1; 
+
+      flHum = modf(getMeasurement(HUMIDITY), &intHum);
+      EEPROM.write(EEPROM_ADDRESS, intHum);
+      EEPROM_ADDRESS +=1; 
+
+      flHum *= 100;
+      EEPROM.write(EEPROM_ADDRESS, flHum);
+      EEPROM_ADDRESS +=1; 
       digitalWrite(RED_LED,LOW);
+      delay(SECOND);
     }
 
     st7565DrawString_P(0, 36, PSTR("HUM LIMIT: "));
@@ -419,12 +426,28 @@ void logEvents(){
     st7565DrawString(13*6, 36, mBuf);
     st7565DrawString_P(13*7, 36, PSTR(" %"));
 
-    if(currentTemp > HUM_LIMIT){
-      tone(_BUZZER, 100, 10);
+    if(currentHum > HUM_LIMIT){
       digitalWrite(RED_LED,HIGH);
-      // write time to eeprom
+      EEPROM.write(EEPROM_ADDRESS, getTime(2));
+      EEPROM_ADDRESS +=1;    
+      EEPROM.write(EEPROM_ADDRESS, getTime(1));
+      EEPROM_ADDRESS +=1;   
+      flTemp = modf(getMeasurement(TEMPERATURE), &intTemp);
+      EEPROM.write(EEPROM_ADDRESS, intTemp);
+      EEPROM_ADDRESS +=1; 
+      flTemp *= 100;
+      EEPROM.write(EEPROM_ADDRESS, flTemp);
+      EEPROM_ADDRESS +=1; 
 
+      flHum = modf(getMeasurement(HUMIDITY), &intHum);
+      EEPROM.write(EEPROM_ADDRESS, intHum);
+      EEPROM_ADDRESS +=1; 
+
+      flHum *= 100;
+      EEPROM.write(EEPROM_ADDRESS, flHum);
+      EEPROM_ADDRESS +=1; 
       digitalWrite(RED_LED,LOW);
+      delay(SECOND);
     }
 
     st7565SetFont( Font5x7 );
@@ -437,134 +460,45 @@ void logEvents(){
   }
 }
 
-///* testing endTime */
-//void testTime()
-//{
-//  st7565SetBrightness(12);
-//  st7565ClearBuffer();
-//
-//  int hrs = 0, mins = 0, secs = 0, done = 0;
-//
-//  while(true){
-//    st7565ClearBuffer();
-//    st7565SetFont( Font12x16 );
-//    st7565DrawString_P( 0, 0,  PSTR("Test timing") );
-//
-//    // buttons
-//    st7565SetFont( Font12x24Numbers );
-//
-//    /* get and display hours */
-//    sprintf(mBuf, "%u", hrs);
-//    st7565DrawString( 38, 38, mBuf);
-//    st7565SetFont( Font12x16 );
-//    st7565DrawString_P( 65, 45, PSTR(":") );
-//
-//    if(!digitalRead(BUT2))
-//      delayMicroseconds(100);
-//    if(!digitalRead(BUT2))
-//      hrs++;
-//    delay(100);
-//
-//    // max 2 hours 50 mins
-//    if(hrs>2){
-//      hrs = 0;
-//    }
-//    if(mins > 59){
-//      mins = 0;
-//    }
-//
-//    /* get and display minutes */
-//    st7565SetFont( Font12x24Numbers );
-//    sprintf(mBuf, "%u", mins);
-//    st7565DrawString( 76, 38, mBuf);
-//
-//    // now
-//    int nowSecs = getTime(0);
-//    int nowMins = getTime(1);
-//    int nowHrs = getTime(2);
-//
-//    st7565SetFont(Font5x7); 
-//    sprintf(mBuf, "%u", nowHrs);
-//    st7565DrawString(0, 26, mBuf);
-//
-//    st7565SetFont(Font5x7); 
-//    sprintf(mBuf, "%u", nowMins);
-//    st7565DrawString(6*6, 26, mBuf);
-//
-//    st7565SetFont(Font5x7); 
-//    sprintf(mBuf, "%u", nowSecs);
-//    st7565DrawString(13*6, 26, mBuf);
-//
-//    // count end time
-//    int endHrs = nowHrs + hrs;
-//    int endMins = nowMins + mins;
-//    int endSecs;
-//    if(nowSecs == 0){
-//      endSecs = 59;
-//    }
-//    else{
-//      endSecs = nowSecs - 1;
-//    }
-//
-//    if(endMins >= 60){
-//      endHrs++;
-//      endMins -= 60;
-//    }
-//
-//    st7565SetFont(Font5x7); 
-//    sprintf(mBuf, "%u", endHrs);
-//    st7565DrawString(0, 36, mBuf);
-//    sprintf(mBuf, "%u", endMins);
-//    st7565DrawString(6*6, 36, mBuf);
-//    sprintf(mBuf, "%u", endSecs);
-//    st7565DrawString(13*6, 36, mBuf);
-//
-//    if(!digitalRead(BUT3))
-//      delayMicroseconds(100);
-//    if(!digitalRead(BUT3))
-//      mins++;
-//    delay(100);
-//
-//    st7565SetFont( Font5x7 );
-//    st7565DrawString_P( 102, 56, PSTR("Exit") );
-//    st7565DrawString_P( 0, 56, PSTR("Start") );
-//    st7565Refresh();
-//
-//    if(button4Pressed())    
-//      return;
-//  }
-//}
-
 /* display EEPROM */
 void viewLog(){
   st7565SetBrightness(12);
   st7565ClearBuffer();
-  
-   
-  while(true){
 
+  int i = 0;
+
+  while(true){
     st7565ClearBuffer();
     st7565SetFont(Font12x16);
     st7565DrawString_P(0, 0, PSTR("View log"));
-
     st7565SetFont( Font5x7 );
-    
-//    printLog(newBegin, newBegin+3);
-    // draw an arrow
+    printLog(i, i+3);
+
     if (totalMeas > 4){
       st7565DrawString_P( 80, 56, PSTR("-->") );
-      
-        printLog(newBegin, newBegin+3);
-//        if(!digitalRead(BUT3)){
-          delayMicroseconds(100);
-          newBegin += 4;
-//        }
+      if(!digitalRead(BUT3)){
+        st7565ClearBuffer();
+        st7565SetFont(Font12x16);
+        st7565DrawString_P(0, 0, PSTR("View log"));
+        i += 4;
+        st7565SetFont( Font5x7 );
+        printLog(i, i+3);
+        delay(2000);
+      }
+      else{
+        i = 0;
+      }
     }
     else{
-      printLog(0, totalMeas-1);
+      st7565ClearBuffer();
+      st7565SetFont(Font12x16);
+      st7565DrawString_P(0, 0, PSTR("View log"));
+      i += 4;
+      st7565SetFont( Font5x7 );
+      printLog(0, 3);
+      delay(2000);
     }
-    
-    
+
     // erasing all data
     if(!digitalRead(BUT1)){
       delayMicroseconds(100);
@@ -573,35 +507,22 @@ void viewLog(){
         EEPROM.write(i, 0);
       }
     }
-    
+
     st7565DrawString_P( 102, 56, PSTR("Exit") );
     st7565DrawString_P( 0, 56, PSTR("Erase") );
 
     st7565Refresh();
     if(button4Pressed())    
       return;
-    }
+  }
 }
-//}
 
 void loop() {
-  //monitor();    // current data
-  //logEvents();  // log events time 
-  logData();   // store data every minute for N times
-  //testTime();
+  monitor();
+  logEvents(); 
+  logData();
   viewLog();
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
