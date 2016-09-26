@@ -1,5 +1,13 @@
-#include <math.h>
+/*
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 42):
+ * <sasha.p@hush.com> wrote this file.  As long as you retain this notice you
+ * can do whatever you want with this stuff. If we meet some day, and you think
+ * this stuff is worth it, you can buy me a beer in return.
+ * ----------------------------------------------------------------------------
+ */
 
+#include <math.h>
 #include <KK2LCD.h>
 #include <Wire.h>
 #include <EEPROM.h>
@@ -12,6 +20,9 @@
 #define MINUTE (60*SECOND)
 #define HOUR (60*MINUTE)
 #define DAY (24*HOUR)
+
+/* DEFAULT LOG DATA PERIOD */
+#define LOG_TIME MINUTE
 
 /* set temperature and humidity limit */
 const int TEMP_LIMIT = 23;
@@ -106,7 +117,6 @@ int getTime(int tVal){
 
   return reading[tVal];
 }
-
 
 byte bcdToDec(byte val)  {
   // convert binary coded decimal to normal decimal numbers
@@ -232,8 +242,6 @@ void monitor(){
 
   while (true)
   {
-    float temp, hum;
-
     st7565SetBrightness(12);
     st7565ClearBuffer();
     st7565SetFont(Font12x16);
@@ -245,7 +253,7 @@ void monitor(){
     st7565DrawString( 0, 56, mBuf);
     st7565DrawString_P( 13, 56, PSTR(":") );
 
-    // minuits
+    // minutes
     sprintf(mBuf, "%u", getTime(1));
     st7565DrawString( 19, 56, mBuf);
 
@@ -259,17 +267,15 @@ void monitor(){
     st7565DrawString_P(0, 36, PSTR("HUMIDITY: "));
 
     /* humidity sensor fails sometimes */
-    if (hum < 0){
+    if (getMeasurement(HUMIDITY) < 0){
       st7565DrawString(13*6, 36, "  N/A");
-      for(int i=0; i<2; ++i){
-        tone(_BUZZER, 100, 10);
-      }
+      tone(_BUZZER, 100, 10);
     }
     else {
       st7565DrawString(13*6, 36, dtostrf(getMeasurement(HUMIDITY), 6, 2, mBuf));
     }
 
-    delay(1000);
+    delay(SECOND);
 
     st7565DrawString_P( 102, 56, PSTR("Exit") );
     st7565Refresh(); 
@@ -286,6 +292,7 @@ void logData()
   st7565ClearBuffer();
 
   int hrs = 0, mins = 0, secs = 0, done = 0;
+  // set to beginning for overwriting
   EEPROM_ADDRESS = 0;
 
   while(true){
@@ -348,8 +355,9 @@ void logData()
         EEPROM.write(4 + i*6, intHum);
         flHum *= 100;
         EEPROM.write(5 + i*6, flHum);
+        
         // important!
-        delay(SECOND);
+        delay(LOG_TIME);
       }
 
       // bye
@@ -465,6 +473,7 @@ void viewLog(){
   st7565SetBrightness(12);
   st7565ClearBuffer();
 
+  // LCD fits only 4 lines of 5x7 font
   int i = 0;
 
   while(true){
@@ -483,7 +492,7 @@ void viewLog(){
         i += 4;
         st7565SetFont( Font5x7 );
         printLog(i, i+3);
-        delay(2000);
+        delay(SECOND);
       }
       else{
         i = 0;
@@ -496,7 +505,7 @@ void viewLog(){
       i += 4;
       st7565SetFont( Font5x7 );
       printLog(0, 3);
-      delay(2000);
+      delay(SECOND);
     }
 
     // erasing all data
@@ -523,6 +532,3 @@ void loop() {
   logData();
   viewLog();
 }
-
-
-
